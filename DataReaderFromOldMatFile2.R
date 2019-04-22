@@ -8,7 +8,6 @@ HomePc=1; #for home PC 0 for lab
 removeInterppoint=1;#to remove interpolated points?
 SubsetData=0; #To set as 0 for not subsetting#the whole data  points is 985771 points for 2015. 
 
-
 #D:\OrrS2\Box Sync\R codes\VulturesCodes\unitedGPSDataFromPhd.mat"
 
 ###### Helper functions ######
