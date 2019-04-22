@@ -159,9 +159,12 @@ if (HomePc==1) {
 
 #files = list.files(m.input.path, full.names=TRUE)
 #if(! (length(files)>0)){print("no files in folder or wrong path")}  
-File.name="UnitedGPSDataFromPhD"; #for the 2015 data, not 2010 2009
+File.name="UnitedGPSDataFromPhD"; #
 Data.FromMat <-readMat(paste(m.input.path,File.name,".mat", sep = ""))
-
+Data.FromMat[['GeoStruct']]=NULL
+View(Data.FromMat[['GeoStruct']])
+dataStrct=Data.FromMat[["TagsDataStrctrIntrpl"]]
+save(dataStrct,file='temp.rdata')
 
 str(Data.FromMat)
 #columns in 1=tag 2=date&time 3=date only 4=time only 5=Lat 6=Long 7=elevation 8=speed 
