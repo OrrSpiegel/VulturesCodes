@@ -148,5 +148,6 @@ for (indv in 1:length(unstackedOhad) ){#loop on individuals, now in separate Mov
 
 
 
+
 #### Calculation of the utilization distribution ####
 brownian.bridge.dyn
