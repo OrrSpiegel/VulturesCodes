@@ -11,7 +11,7 @@ require(spatsoc);require("asnipe");require("igraph"); # for working with the SN 
 
 #### key paramterer values ######
 MaxSpeedPermited=120 #in movebank units (m/s??) anything above this will be filtered
-MB.LoginObject=movebankLogin(username='ors',password='eesH1eeF')
+MB.LoginObject=movebankLogin(username='ors',password='XXXXXX')
 VulturesToPlotMap=10:15 #1:length(unstackedOhad) #out of the vultures in the DB which one to plot? choose a few out of the 83
 DistThresholM=2000 #in meters
 TimeThreshold='10 minutes' #in this format 'XX units'
