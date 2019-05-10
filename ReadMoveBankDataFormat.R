@@ -1,11 +1,11 @@
 # Apr 23rd :-) 2019 trying to read movebank data using move
 
 
-#### getting packages #######
+#### loading packages #######
 require(move)#for downloading data
 require(mapproj);require(ggmap) #these packages are necessary to work with google maps
 require(spatsoc);require("asnipe");require("igraph"); # for working with the SN parts
-
+require(reshape);require(data.table) #for the manual section where i build the SN myself
 #require(dplyr) 
 #require(tidyverse) 
 
@@ -24,8 +24,8 @@ TimeThreshold='10 minutes' #in this format 'XX units'
 #timestamp_start, timestamp_end character or POSIXct=?yyyyMMddHHmmssSSS?
 MoveStackDatasetOhad=getMovebankData(study=6071688, login=MB.LoginObject,
         includeExtraSensors=FALSE, deploymentAsIndividuals=FALSE,removeDuplicatedTimestamps=TRUE)#animalName
-MoveStackDatasetOrr=getMovebankData(study=6638215, login=MB.LoginObject,
-                                 includeExtraSensors=FALSE, deploymentAsIndividuals=FALSE,removeDuplicatedTimestamps=TRUE)#animalName
+#MoveStackDatasetOrr=getMovebankData(study=6638215, login=MB.LoginObject,
+#                                 includeExtraSensors=FALSE, deploymentAsIndividuals=FALSE,removeDuplicatedTimestamps=TRUE)#animalName
 
 #returns or a MoveStack object can use as.data.frame
 #corridor
@@ -40,7 +40,7 @@ citations(MoveStackDatasetOrr)
 equalProj(MoveStackDatasetOrr)
 n.locs(MoveStackDatasetOhad)
 timeLag(MoveStackDatasetOhad)
-#too heavy but works: plot(MoveStackDatasetOhad,  lwd=2, xlab="location_long", ylab="location_lat")
+#too heavy but works: plot(MoveStackDatasetOhad,  lwd=2, xlab="location_long", ylab="location_lat",col='blue',pch=5)
 
 
 ############# very basic filtering. stage 1  ##############
@@ -137,7 +137,7 @@ print(Map);rm(Map)
 
 ## plot 2 colors by tag
 Map=ggmap(mapObj)+
-  geom_path(data=DatasetOhadF, aes(x=location_long, y=location_lat,colour = ID), size=1,show.legend = FALSE) +
+  geom_path(data=DatasetOhadF, aes(x=location_long, y=location_lat,colour = trackId), size=1,show.legend = FALSE) +
   #scale_colour_gradient2(low = "blue",mid='purple',high = "red",midpoint = mean(as.numeric(DatasetOhadF$DateOnly)))+
   #ggtitle(paste("Indiv=",indv, ', name=',TagsMetaData$name[indv],"duration",TagsMetaData$TrackDurationDays[indv],'day',sep=' '))
   ggtitle('all tags together, colors but ID');print(Map)
@@ -187,7 +187,7 @@ DatasetOhadF=data.table::setDT(DatasetOhadF,keep.rownames=T)#and now to a data.t
 
 ## renaming\adding columns
 DatasetOhadF$ID=DatasetOhadF$trackId
-DatasetOhadF$location_long2=DatasetOhadF$location_long
+DatasetOhadF$location_long1=DatasetOhadF$location_long
 DatasetOhadF$location_lat1=DatasetOhadF$location_lat
 
 ## adding coordinates with a metric value ##### #
@@ -211,23 +211,29 @@ head(coordinates(DatasetOhadF_utmN))#now the lat long are in metric
 DatasetOhadF$Easting=coordinates(DatasetOhadF_utmN)[,1]
 DatasetOhadF$Northing=coordinates(DatasetOhadF_utmN)[,2]
 
-## groupping into time groups
+## using spatsoc for groupping into time groups
+#DatasetOhadF=
 group_times(DatasetOhadF, datetime = 'timestamp', threshold = TimeThreshold)
 
-## grouping into spatial groups with the metric values
+## using spatsoc for grouping into spatial groups with the metric values
+#DatasetOhadF=
 group_pts(DatasetOhadF, threshold = DistThresholM, id = 'ID', coords = c('Northing', 'Easting'), timegroup = 'timegroup')
 #use group_lines instead??
 
 #group_times(DT = DT, datetime = 'datetime', threshold = '1 day')
 #group_lines(DT, threshold = 50, projection = utm,   id = 'ID', coords = c('X', 'Y'),timegroup = 'timegroup', sortBy = 'datetime')
-edge_nn(DatasetOhadF, id = 'ID', coords = c('Northing', 'Easting'), timegroup = 'timegroup')
-View(DatasetOhadF)
+#DatasetOhadF=edge_nn(DatasetOhadF, id = 'ID', coords = c('Northing', 'Easting'), timegroup = 'timegroup')
+#View(DatasetOhadF)
 
-#### 
+#### working with the SN 
 gbiOhad <- get_gbi(DatasetOhadF, group = 'group', id = 'ID')
 netOhad <- get_network(gbiOhad, data_format = "GBI", association_index = "SRI")
 
-g <- graph.adjacency(netOhad, 'undirected', diag = FALSE, weighted = TRUE)
+Graph1 <- graph.adjacency(netOhad, 'undirected', diag = FALSE, weighted = TRUE)
+plot.igraph(Graph1)
+tkplot(Graph1)
+demo(package="igraph")
+
 
 ##### manual distanc calculation and SN construction#####
 CoocuranceCounter   <- expand.grid(unique(as.character(DatasetOhadF$ID)),unique(as.character(DatasetOhadF$ID)))#a long form of all possible dyads to count interaction
@@ -399,7 +405,7 @@ EPSG = LatLonToUTMEPSGCode(lat =DatasetOhadF$location_lat, lon = DatasetOhadF$lo
 library(maps)
 library(reshape)  
 library(dplyr)
-library(data.table)
+
 
 # Load world cities data and keep only 300 cities, which will give us 90,000 pairs
 data(world.cities)
