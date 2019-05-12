@@ -11,13 +11,16 @@ require(reshape);require(data.table) #for the manual section where i build the S
 
 #### key paramterer values ######
 MaxSpeedPermited=120 #in movebank units (m/s??) anything above this will be filtered
-MB.LoginObject=movebankLogin(username='ors',password='eesH1eeF')
+load('movebankPW.rdata')#the PW for movebank
 VulturesToPlotMap=10:15 #1:length(unstackedOhad) #out of the vultures in the DB which one to plot? choose a few out of the 83
 DistThresholM=2000 #in meters
 TimeThreshold='10 minutes' #in this format 'XX units'
+#TagsMetaData
+
 
 ################### reading data from movebank ###################
-#movebank user ors PW: eesH1eeF
+#movebank user ors PW: XXXXXX
+MB.LoginObject=movebankLogin(username='ors',password=Password);rm(Password)
 #"Gyps fulvus INPA Hatzofe" Movebank ID	6071688
 #"HUJ MoveEcol Lab Israel: Griffon vulture Gyps fulvus" Movebank ID	6638215
 #"E-obs Gsm Vultures Israel" Movebank ID	7359070
@@ -46,7 +49,8 @@ timeLag(MoveStackDatasetOhad)
 ############# very basic filtering. stage 1  ##############
 #without going to a data frame since i cannot go back and doing it one by one (another try)###
 ## creating an empty metadata storage df
-TagsMetaData=setNames(data.frame(matrix(ncol =6, nrow = length(unstackedOhad))), c('name',"InitialPoints", "PercentThrown", "N_locs","TrackDurationDays","TrackDurationStartEnd"))
+TagsMetaData=setNames(data.frame(matrix(ncol =8, nrow = length(unstackedOhad))), 
+                      c('name',"InitialPoints", "PercentThrown", "N_locs","TrackDurationDays","DaysBetweenStartEnd",'FirstDay','LastDay'))
 
 ## a loop on tags. Need to check tags: 75,76,77,78, and maybe also 3 and 10. ###### #
 for (indv in 1:length(unstackedOhad) ){## loop on individuals, now in separate Move objects
@@ -102,8 +106,11 @@ for (indv in 1:length(unstackedOhad) ){## loop on individuals, now in separate M
   ## collecting metadata and plotting fitered track: 
   TagsMetaData$N_locs[indv]=  dim(unstackedOhad[[indv]]@data)[1]
   TagsMetaData$TrackDurationDays[indv]=  length(unique(as.Date(as.character(unstackedOhad[[indv]]@data$timestamp))))
-  TagsMetaData$TrackDurationStartEnd[indv]=  (max(as.Date(as.character(unstackedOhad[[indv]]@data$timestamp)))-min(as.Date(as.character(unstackedOhad[[indv]]@data$timestamp))))
-  lines(unstackedOhad[[indv]],col='red')
+  #TagsMetaData$DaysBetweenStartEnd[indv]=  (max(as.Date(as.character(unstackedOhad[[indv]]@data$timestamp)))-min(as.Date(as.character(unstackedOhad[[indv]]@data$timestamp))))
+  TagsMetaData$FirstDay[indv]=as.character(min(as.Date(as.character(unstackedOhad[[indv]]@data$timestamp))));
+  TagsMetaData$LastDay[indv]= as.character(max(as.Date(as.character(unstackedOhad[[indv]]@data$timestamp))));
+  TagsMetaData$DaysBetweenStartEnd[indv]=as.Date(TagsMetaData$LastDay[indv])-as.Date(TagsMetaData$FirstDay[indv]);
+    lines(unstackedOhad[[indv]],col='red')
   #plot(unstackedOhad[[indv]], type="o", col=3, lwd=2, pch=20, xlab="location_long", ylab="location_lat")
   
   ##logging metadata
@@ -211,64 +218,58 @@ head(coordinates(DatasetOhadF_utmN))#now the lat long are in metric
 DatasetOhadF$Easting=coordinates(DatasetOhadF_utmN)[,1]
 DatasetOhadF$Northing=coordinates(DatasetOhadF_utmN)[,2]
 
-## using spatsoc for groupping into time groups
-#DatasetOhadF=
-group_times(DatasetOhadF, datetime = 'timestamp', threshold = TimeThreshold)
+start_time <- Sys.time()
+  ## using spatsoc for groupping into time groups
+  #DatasetOhadF=
+  group_times(DatasetOhadF, datetime = 'timestamp', threshold = TimeThreshold)
+  
+  ## using spatsoc for grouping into spatial groups with the metric values
+  #DatasetOhadF=
+  group_pts(DatasetOhadF, threshold = DistThresholM, id = 'ID', coords = c('Northing', 'Easting'), timegroup = 'timegroup')
+  #use group_lines instead??
+end_time <- Sys.time()
 
-## using spatsoc for grouping into spatial groups with the metric values
-#DatasetOhadF=
-group_pts(DatasetOhadF, threshold = DistThresholM, id = 'ID', coords = c('Northing', 'Easting'), timegroup = 'timegroup')
-#use group_lines instead??
+end_time - start_time
+#
 
 #group_times(DT = DT, datetime = 'datetime', threshold = '1 day')
 #group_lines(DT, threshold = 50, projection = utm,   id = 'ID', coords = c('X', 'Y'),timegroup = 'timegroup', sortBy = 'datetime')
 #DatasetOhadF=edge_nn(DatasetOhadF, id = 'ID', coords = c('Northing', 'Easting'), timegroup = 'timegroup')
 #View(DatasetOhadF)
 
-#### working with the SN 
+
+##### manual distance calculation and SN construction #####
+SimlDataPntCnt   = expand.grid(unique(as.character(DatasetOhadF$ID)),unique(as.character(DatasetOhadF$ID)))#a long form of all possible dyads to count interaction
+SimlDataPntCnt$counter=0;names(SimlDataPntCnt)=c('ID','ID2','counter')
+CoocurCountr = SimlDataPntCnt#a long form of all possible dyads to count intervals both were at the same timegroup
+SRIlongform=CoocurCountr;names(SRIlongform)[3]='SRI'
+#if (CountTwice) Add=0.5 else Add=1
+start_time <- Sys.time()
+  source('LoopTimegroups.R')
+end_time <- Sys.time()
+
+end_time - start_time
+# Time difference of  mins
+
+#reshapng the long form into a matrix
+SRIlongform$SRI=CoocurCountr$counter/SimlDataPntCnt$counter# ratio of number of co-occurances/number of simluatnous datapoints 
+SRI_mrtx=as.matrix(tidyr::spread(data=SRIlongform, key= ID2, value=SRI))
+rownames(SRI_mrtx)=SRI_mrtx[,1];SRI_mrtx=SRI_mrtx[,-1]#just setting row names from the dataframe
+Diag=diag(SRI_mrtx)#self
+#just for testing: replace NA with zero 0:  SRI_mrtx[is.na(SRI_mrtx)] <- 0
+
+#### working with the SN ######
 gbiOhad <- get_gbi(DatasetOhadF, group = 'group', id = 'ID')
 netOhad <- get_network(gbiOhad, data_format = "GBI", association_index = "SRI")
 
 Graph1 <- graph.adjacency(netOhad, 'undirected', diag = FALSE, weighted = TRUE)
+Graph2 <- graph.adjacency(adjmatrix=SRI_mrtx, mode='undirected', diag = FALSE, weighted = TRUE)
 plot.igraph(Graph1)
 tkplot(Graph1)
 demo(package="igraph")
+tkplot(Graph2)
 
-
-##### manual distanc calculation and SN construction#####
-CoocuranceCounter   <- expand.grid(unique(as.character(DatasetOhadF$ID)),unique(as.character(DatasetOhadF$ID)))#a long form of all possible dyads to count interaction
-SimDatapointCounter <- expand.grid(unique(as.character(DatasetOhadF$ID)),unique(as.character(DatasetOhadF$ID)))#a long form of all possible dyads to count intervals both were atthe same timegroup
-
-
-ColumToSelect=c("ID","Northing","Easting","location_lat","location_long",'timegroup',"group")
-for (timgrpind in 1: max(DatasetOhadF$timegroup)){
-  ## extract current time group #18458 has a good example
-  #subset(DatasetOhadF, timegroup==timgrpind,select=c("ID","location_lat","location_long"))
-  timegroupDF=subset(DatasetOhadF, timegroup==timgrpind,select=ColumToSelect)
-  
-  if (dim(timegroupDF)[1]>1){#more than one vulture in this time group?
-    print(timegroupDF[order(timegroupDF$group),])#,'timegroupDF$ID'#plot it
-    
-    # create all possible dyads of vultures in a long format
-    timegroupDF=subset(timegroupDF, timegroup==timgrpind,select=c("ID","location_lat","location_long","group"))
-    dt <- expand.grid.df(timegroupDF,timegroupDF)
-    names(dt)[6:7] <- c("lat_secondInd","long_secondInd")
-    
-    setDT(dt)[ , dist_km := distGeo(matrix(c(location_long, location_lat), ncol = 2), 
-                                    matrix(c(long_secondInd, lat_secondInd), ncol = 2))/1000];
-    
-    ##subsetting to the witihn distancethreshold lines
-    PresentVultures=subset(dt, dist_km==0,select=c(1,5))#these are the vultures present in this time group
-    as.character(PresentVultures[,1])==as.character(PresentVultures[,2])
-    #PresentVultures=unique(PresentVultures$ID);
-    
-    InteractingDyads=subset(dt, dist_km<=(DistThresholM/1000)&dist_km!=0)
-    print(InteractingDyads[order(InteractingDyads$group,InteractingDyads$ID),])#,'timegroupDF$ID'#plot it
-    
-    rm(dt)
-  }#more than one vulture in this time group?
-  
-}#loop on time groups
+save(file='MinimalForNoa.rdata',list=c("SRI_mrtx","TagsMetaData","SRIlongform","CoocurCountr","SimlDataPntCnt"))
 
 
 

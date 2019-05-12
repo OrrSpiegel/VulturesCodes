@@ -3,8 +3,10 @@
 ## for each one it updates the nubers of co-occuring vultures, including self 
 ## also the updates the counters of simulatnounsly tracked vultures 
 ## note that each dyad, including self is counter twice A--A and B--A or if self A--A and A--A
-#takes ~60 min?
+#takes ~3.5 hours
 
+ColumToSelect=c("ID","location_lat","location_long","Easting","Northing","timegroup","group")
+  
 for (timgrpind in 1: max(DatasetOhadF$timegroup)){#loop on all time groups
   ## extract current time group (#18458 has a good example)
   #subset(DatasetOhadF, timegroup==timgrpind,select=c("ID","location_lat","location_long"))
