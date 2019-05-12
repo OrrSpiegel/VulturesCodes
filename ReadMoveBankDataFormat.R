@@ -11,7 +11,7 @@ require(reshape);require(data.table) #for the manual section where i build the S
 
 #### key paramterer values ######
 MaxSpeedPermited=120 #in movebank units (m/s??) anything above this will be filtered
-MB.LoginObject=movebankLogin(username='ors',password='XXXXXX')
+MB.LoginObject=movebankLogin(username='ors',password='eesH1eeF')
 VulturesToPlotMap=10:15 #1:length(unstackedOhad) #out of the vultures in the DB which one to plot? choose a few out of the 83
 DistThresholM=2000 #in meters
 TimeThreshold='10 minutes' #in this format 'XX units'
