@@ -6,6 +6,7 @@ require(move)#for downloading data
 require(mapproj);require(ggmap) #these packages are necessary to work with google maps
 require(spatsoc);require("asnipe");require("igraph"); # for working with the SN parts
 require(reshape);require(data.table) #for the manual section where i build the SN myself
+require(adehabitatLT);
 #require(dplyr) 
 #require(tidyverse) 
 
@@ -15,6 +16,7 @@ load('movebankPW.rdata')#the PW for movebank
 VulturesToPlotMap=10:15 #1:length(unstackedOhad) #out of the vultures in the DB which one to plot? choose a few out of the 83
 DistThresholM=2000 #in meters
 TimeThreshold='10 minutes' #in this format 'XX units'
+MinCoocurForValue=30; #miniimal number of coocurences for considering a viable pair
 #TagsMetaData
 
 
@@ -189,7 +191,8 @@ for (indv in VulturesToPlotMap ){## loop on individuals, now for plotting
 ## converting to a df and than data.table after fitlering
 #now done above: BackStackedOhad=moveStack(unstackedOhad) #splitting Ohads data into individuals 
 #too heavy but works: plot(BackStackedOhad,  lwd=2, xlab="location_long", ylab="location_lat")
-DatasetOhadF=as.data.frame(BackStackedOhad) #converting to a dataset 
+DatasetOhadF_ltraj=move2ade(BackStackedOhad)
+DatasetOhadF=as.data.frame(BackStackedOhad) #converting to a dataset F for filtered
 DatasetOhadF=data.table::setDT(DatasetOhadF,keep.rownames=T)#and now to a data.table
 
 ## renaming\adding columns
@@ -251,21 +254,65 @@ end_time <- Sys.time()
 end_time - start_time
 # Time difference of  mins
 
+
+
+
 #reshapng the long form into a matrix
-SRIlongform$SRI=CoocurCountr$counter/SimlDataPntCnt$counter# ratio of number of co-occurances/number of simluatnous datapoints 
+summary(SRIlongform)# ok now no values above 1.... typo corrected
+SRIlongform$SRI=as.numeric(CoocurCountr$counter/SimlDataPntCnt$counter)# ratio of number of co-occurances/number of simluatnous datapoints 
+hist(SRIlongform$SRI);range(SRIlongform$SRI,na.rm=T)
 SRI_mrtx=as.matrix(tidyr::spread(data=SRIlongform, key= ID2, value=SRI))
-rownames(SRI_mrtx)=SRI_mrtx[,1];SRI_mrtx=SRI_mrtx[,-1]#just setting row names from the dataframe
-Diag=diag(SRI_mrtx)#self
+Coocur_mrtx=as.matrix(tidyr::spread(data=CoocurCountr, key= ID2, value=counter))
+
+#rownames(SRI_mrtx)=SRI_mrtx[,1];SRI_mrtx=SRI_mrtx[,-1]#just setting row names from the dataframe
+NamesInMtrx=SRI_mrtx[,1];SRI_mrtx=SRI_mrtx[,-1]#just setting row names from the dataframe
+M=mapply(SRI_mrtx, FUN=as.numeric)#converting to numeric matrix
+SRI_mrtx<- matrix(data=M, ncol=ncol(SRI_mrtx), nrow=nrow(SRI_mrtx))
+rownames(SRI_mrtx)=NamesInMtrx;colnames(SRI_mrtx)=NamesInMtrx
+
+Diag=diag(SRI_mrtx);unique(Diag);#self, indeed always 1, lets remove them:
+diag(SRI_mrtx)=NA
 #just for testing: replace NA with zero 0:  SRI_mrtx[is.na(SRI_mrtx)] <- 0
+MaxIndSRI=apply(SRI_mrtx,2,max, na.rm=T)#the max value in each row
+print(paste('even after removing diagonal self connection there are still', sum(MaxIndSRI==1),'fully connected dyads with MinCoocurForValue of',MinCoocurForValue))
+
+fullycoupled=which(SRI_mrtx == 1, arr.ind = TRUE)
+sapply(1:dim(fullycoupled)[1], function (x){NamesInMtrx[fullycoupled[x, ]]})
+sapply(1:dim(fullycoupled)[1], function (x){Coocur_mrtx[fullycoupled[x, ]]})
+
+#just for testing: replace NA with zero 0:  
+SRI_mrtx[is.na(SRI_mrtx)] <- 0# if with NA then all lines are connected
+#just for testing: replace NA with zero 0:  
+SRI_mrtx[Coocur_mrtx<MinCoocurForValue] <- 0# if with NA then all lines are connected
+
+        
+image(SRI_mrtx)
+image(SRI_mrtx, col=topo.colors(10),axes=T, asp=1)#of heat colors or rainbow
+title(main="SRI for Ohad's vultures  \n ", font.main=4)
+colorRamp
+
+
+#debugging, now solved already:
+# Hmmm=which(SRIlongform$SRI>1)
+# CoocurCountr$rowN=1:dim(CoocurCountr)[1];
+# SimlDataPntCnt$rowN=1:dim(SimlDataPntCnt)[1];
+# SRIlongform$rowN=1:dim(SRIlongform)[1];
+# 
+# debug=merge.data.frame(x = CoocurCountr[Hmmm,],y=SimlDataPntCnt[Hmmm,],by='rowN')
+# debug=merge.data.frame(x = debug,y=SRIlongform[Hmmm,],by='rowN')
+
+#,SRIlongform[Hmmm,]);
 
 #### working with the SN ######
 gbiOhad <- get_gbi(DatasetOhadF, group = 'group', id = 'ID')
 netOhad <- get_network(gbiOhad, data_format = "GBI", association_index = "SRI")
 
 Graph1 <- graph.adjacency(netOhad, 'undirected', diag = FALSE, weighted = TRUE)
+
+
 Graph2 <- graph.adjacency(adjmatrix=SRI_mrtx, mode='undirected', diag = FALSE, weighted = TRUE)
-plot.igraph(Graph1)
-tkplot(Graph1)
+plot.igraph(Graph2)
+tkplot(Graph2)
 demo(package="igraph")
 tkplot(Graph2)
 
@@ -275,6 +322,76 @@ save(file='MinimalForNoa.rdata',list=c("SRI_mrtx","TagsMetaData","SRIlongform","
 
 #### Calculation of the utilization distribution ####
 brownian.bridge.dyn
+
+#### Movement analysis of the data ######
+#conversion to class of adehabitatLT
+names(DatasetOhadF_wgs)
+dim(coordinates(DatasetOhadF_wgs))
+
+#DatasetOhadF_ltraj=move2ade(BackStackedOhad)  #works but doenst keept time stamps??
+df=as.data.frame(DatasetOhadF_wgs)
+names(df)
+DatasetOhadF_ltraj=dl(x=as.data.frame(DatasetOhadF_wgs),proj4string=CRS()) #seems to work fine?
+DatasetOhadF_ltraj=as(BackStackedOhad,"ltraj") #seems to work fine?
+infolocs(DatasetOhadF_ltraj)
+head(DatasetOhadF_ltraj[[1]])
+GPSdatasetFltrDF=ld(DatasetOhadF_ltraj)
+GPSdatasetFltrDF$dateOnly=format(as.Date(GPSdatasetFltrDF$date), "%Y%m%d")
+GPSdatasetFltrDF$burst=paste(as.character(GPSdatasetFltrDF$id),GPSdatasetFltrDF$dateOnly,sep='_')
+trajdyn(x=DatasetOhadF_ltraj[[50]])
+plot(DatasetOhadF_ltraj[[50]])
+
+names(BackStackedOhad$coords.x1)
+head(coordinates(MoveStackDatasetOhad))
+head(coordinates(BackStackedOhad))
+DatasetOhadF_ltraj=as(MoveStackDatasetOhad,"ltraj") #seems to work fine?
+infolocs(DatasetOhadF_ltraj)[[1]]
+head(DatasetOhadF_ltraj[[1]])
+
+
+#### DataFrame By Day by vulture #####
+GPSdatasetFltrDF$dateOnly=as.POSIXct((GPSdatasetFltrDF$date), format="%Y-%m-%d ",tz="UTC",origin="1970-01-01")
+DailyData=data.frame(Burst=unique(GPSdatasetFltrDF$burst))
+DailyData$id=DailyData$date=DailyData$SumdistM=DailyData$MxDailyDisplcmnt=DailyData$NetDailyDisplcmnt=NA
+for (burstCnt in 1:length(unique(GPSdatasetFltrDF$burst))){
+  indx=which(as.character(GPSdatasetFltrDF$burst)==as.character(DailyData$Burst[burstCnt]))#finding the lines of this current burst in the main dataframe
+  DailyData$id[burstCnt]=as.character(GPSdatasetFltrDF$id[indx[1]])
+  DailyData$date[burstCnt]=GPSdatasetFltrDF$date[indx[1]]
+  DailyData$SumdistM[burstCnt]=sum(GPSdatasetFltrDF$dist[indx],na.rm=T)
+  DailyData$MxDailyDisplcmnt[burstCnt]=sqrt(max(GPSdatasetFltrDF$R2n[indx],na.rm=T))
+  DailyData$NetDailyDisplcmnt[burstCnt]=sqrt(tail(GPSdatasetFltrDF$R2n[indx],na.rm=T,1))
+}
+DailyData$id=as.factor(DailyData$id)
+DailyData=droplevels(DailyData)
+DailyData$date=as.POSIXct((DailyData$date), format="%Y-%m-%d ",tz="UTC",origin="1970-01-01")
+DailyData$Sex1m2f=1;#adding sex
+DailyData$Sex1m2f[DailyData$id %in% c("Chana","Cheli", "Golda","Nikita", "Pola","Ruth")]=2;
+
+
+rm(burstCnt,indx)
+
+hist(DailyData$SumdistM,breaks=50)
+hist(DailyData$MxDailyDisplcmnt,breaks=50)
+summary(DailyData)
+
+
+## adding the mean daily movement to the byIbe2 dataframe
+ByIbex2$NetDailyDisplcmnt=NA;ByIbex2$MxDailyDisplcmnt=NA;ByIbex2$SumdistM=NA
+ByIbex2$MxDailyDisplcmnt=sapply(as.character(ByIbex2$AnimalId),function(i){mean(na.rm=T,DailyData$MxDailyDisplcmnt[as.character(DailyData$id)==i ])})#
+ByIbex2$SumdistM=sapply(as.character(ByIbex2$AnimalId),function(i){mean(na.rm=T,DailyData$SumdistM[as.character(DailyData$id)==i ])})#
+ByIbex2$NetDailyDisplcmnt=sapply(as.character(ByIbex2$AnimalId),function(i){mean(na.rm=T,DailyData$NetDailyDisplcmnt[as.character(DailyData$id)==i ])})#
+
+t.test(SumdistM~Sex1m2f,data=ByIbex2)
+t.test(NetDailyDisplcmnt~Sex1m2f,data=ByIbex2)
+t.test(MxDailyDisplcmnt~Sex1m2f,data=ByIbex2)
+
+
+
+
+
+
+
+
 
 
 

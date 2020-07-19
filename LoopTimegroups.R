@@ -46,6 +46,12 @@ for (timgrpind in 1: max(DatasetOhadF$timegroup)){#loop on all time groups
   InteractingSelf=subset(DT, dist_km==0 & (as.character(ID)==as.character(ID2))) # just including self interactions, once, not multiple times
   InteractingSelf=InteractingSelf[!duplicated(InteractingSelf$ID),]# just including self interactions, once, not multiple times
   InteractingDyads=subset(DT,(dist_km<=DistThresholM/1000 & (as.character(ID)!=as.character(ID2)))) # not including self interactions
+  InteractingDyads=InteractingDyads[!duplicated(InteractingDyads[,c("ID","ID2")])];
+  
+  if(dim(PresentVultures)[1]<dim(InteractingDyads)[1])      {
+    break
+    }#for debugging
+  
   InteractingDyads=rbind(InteractingDyads,InteractingSelf,InteractingSelf)#counting the self twice to keep it like the twice of the non-self dyads
   ## a loop on interacting dyads, non-self, for updating the CoocurCountr storge
   for (dyadcnt in 1: dim(InteractingDyads)[1]){#
