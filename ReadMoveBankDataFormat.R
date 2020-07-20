@@ -23,9 +23,14 @@ MinCoocurForValue=30; #miniimal number of coocurences for considering a viable p
 ################### reading data from movebank ###################
 #movebank user ors PW: XXXXXX
 MB.LoginObject=movebankLogin(username='ors',password=Password);rm(Password)
-#"Gyps fulvus INPA Hatzofe" Movebank ID	6071688
-#"HUJ MoveEcol Lab Israel: Griffon vulture Gyps fulvus" Movebank ID	6638215
-#"E-obs Gsm Vultures Israel" Movebank ID	7359070
+# movebank vulture studies :##
+#1"Gyps fulvus INPA Hatzofe" Movebank ID	6071688 115 vultures, 1.5M fixes
+#2"HUJ MoveEcol Lab Israel: Griffon vulture Gyps fulvus" Movebank ID	6638215 473185 95 vultures, vultures, 0.5M fixes 
+#3"E-obs Gsm Vultures Israel" Movebank ID	7359070
+#4"Eurasian Griffon Vultures 1 Hz HUJ (Israel)" Movebank ID	16924201 - small study 18 vultures but still active!!! 
+#5"Eurasian Griffon Vultures 1 min HUJ (Israel)"  Movebank ID	109437966 vultures - still active!!!
+#
+
 #timestamp_start, timestamp_end character or POSIXct=?yyyyMMddHHmmssSSS?
 MoveStackDatasetOhad=getMovebankData(study=6071688, login=MB.LoginObject,
         includeExtraSensors=FALSE, deploymentAsIndividuals=FALSE,removeDuplicatedTimestamps=TRUE)#animalName
@@ -324,17 +329,28 @@ save(file='MinimalForNoa.rdata',list=c("SRI_mrtx","TagsMetaData","SRIlongform","
 brownian.bridge.dyn
 
 #### Movement analysis of the data ######
-#conversion to class of adehabitatLT
-names(DatasetOhadF_wgs)
-dim(coordinates(DatasetOhadF_wgs))
 
-#DatasetOhadF_ltraj=move2ade(BackStackedOhad)  #works but doenst keept time stamps??
+## conversion to class of adehabitatLT for the distances calculation etcl
+
+#names(DatasetOhadF_wgs)
+#dim(coordinates(DatasetOhadF_wgs))
+
+#creating a dataframe to convert, since from spatial ponts is not easy to convert
 df=as.data.frame(DatasetOhadF_wgs)
-names(df)
-DatasetOhadF_ltraj=dl(x=as.data.frame(DatasetOhadF_wgs),proj4string=CRS()) #seems to work fine?
-DatasetOhadF_ltraj=as(BackStackedOhad,"ltraj") #seems to work fine?
-infolocs(DatasetOhadF_ltraj)
+df$location_lat1=df$location_long1=df$coords.x1=df$coords.x2=df$timestamps=df$trackId=NULL#not needed, duplicated
+names(df)[which(names(df)=='location_lat')]='y';names(df)[which(names(df)=='location_long')]='x';#names needed for ltraj
+names(df)[which(names(df)=='timestamp')]='date';names(df)[which(names(df)=='ID')]='id';#names needed for ltraj
+df$dateOnly=format(as.Date(df$date), "%Y%m%d");df$burst=paste(as.character(df$id),df$dateOnly,sep='_')#names needed for ltraj
+
+## conversion to ltraj
+DatasetOhadF_ltraj=dl(x=as.data.frame(DatasetOhadF_wgs),proj4string=CRS(projection(MoveStackDatasetOhad))) #seems to work fine?
+rm(df)
+head(infolocs(DatasetOhadF_ltraj)[[1]])
 head(DatasetOhadF_ltraj[[1]])
+#DatasetOhadF_ltraj=move2ade(BackStackedOhad)  #works but doenst keept time stamps??
+#DatasetOhadF_ltraj=as(BackStackedOhad,"ltraj") #seems to work fine?
+
+## converting back to a dataframe 
 GPSdatasetFltrDF=ld(DatasetOhadF_ltraj)
 GPSdatasetFltrDF$dateOnly=format(as.Date(GPSdatasetFltrDF$date), "%Y%m%d")
 GPSdatasetFltrDF$burst=paste(as.character(GPSdatasetFltrDF$id),GPSdatasetFltrDF$dateOnly,sep='_')
